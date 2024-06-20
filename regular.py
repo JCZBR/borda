@@ -27,35 +27,53 @@ def register_with_edge_node(edge_node_host, edge_node_port, node_host, node_port
         for file, checksum in local_files.items():
             proxy.register_file(node_host, node_port, file, checksum)
 
+def download(filename):
+    try:
+        print("BATEUUU AQUI")
+        with open(filename, 'rb') as f:
+            file_data = f.read()
+        return base64.b64encode(file_data).decode('utf-8')
+    except Exception as e:
+        return f"Failed to download {filename}: {e}"
+
 def download_file(node_host, node_port, filename):
-    print("NODE:  ", node_host, node_port, filename)
-    print("PORTaAA: ", node_port)
     try:
         with xmlrpc.client.ServerProxy(f'http://{node_host}:{node_port}/') as proxy:
-            print("SLAAA PO", proxy)
             file_data = proxy.download(filename)
-            print("FILE DATA: ",file_data)
             file_data_bytes = base64.b64decode(file_data)
-            print("FILE Bytes: ",file_data_bytes)
             with open(filename, 'wb') as f:
                 f.write(file_data_bytes)
             return f"File '{filename}' downloaded successfully."
     except xmlrpc.client.Fault as fault:
-        print(f"XML-RPC Fault: {fault.faultString} (code: {fault.faultCode})")
+        return f"XML-RPC Fault: {fault.faultString} (code: {fault.faultCode})"
     except xmlrpc.client.ProtocolError as err:
-        print(f"A protocol error occurred: {err.errmsg}")
+        return f"A protocol error occurred: {err.errmsg}"
     except Exception as e:
-        print(f"An error occurred: {e}")
-    except Exception as erro:
-        return f"Failed to download {filename}: {erro}"
+        return f"An error occurred: {e}"
+
+def find_and_download_file(edge_node_host, edge_node_port, filename):
+    print("SALVEEEEEEE")
+    with xmlrpc.client.ServerProxy(f'http://{edge_node_host}:{edge_node_port}/') as proxy:
+        node_info = proxy.find_node_with_file(filename)
+        print("NODE INFO")
+        if node_info:
+            node_host, node_port = node_info
+            with xmlrpc.client.ServerProxy(f'http://{node_host}:{node_port}/') as node_proxy:
+                file_data = node_proxy.download(filename)
+                print("AQUIIII")
+                file_data_bytes = base64.b64decode(file_data)
+                with open(filename, 'wb') as f:
+                    f.write(file_data_bytes)
+                return f"File '{filename}' downloaded successfully from {node_host}:{node_port}."
+        else:
+            return f"File '{filename}' not found in the network."
 
 def start_node(node_host, node_port, edge_node_host, edge_node_port):
     server = SimpleXMLRPCServer((node_host, node_port), allow_none=True)
-    server.register_function(download_file, "download")
-    
+    server.register_function(download, "download")
+    server.register_function(lambda filename: find_and_download_file(edge_node_host, edge_node_port, filename), "find_and_download_file")
     threading.Thread(target=server.serve_forever).start()
     register_with_edge_node(edge_node_host, edge_node_port, node_host, node_port)
-    print(f"Node running on {node_host}:{node_port}")
 
 if __name__ == "__main__":
     node_host = 'localhost'
@@ -63,7 +81,7 @@ if __name__ == "__main__":
     edge_node_host = 'localhost'
     edge_node_port = 8000
     start_node(node_host, node_port, edge_node_host, edge_node_port)
-
+    
     while True:
         filename = input("Enter the name of the file to download (or 'exit' to quit): ")
         if filename.lower() == 'exit':
@@ -74,7 +92,6 @@ if __name__ == "__main__":
                 node_info = proxy.find_node_with_file(filename)
                 if node_info:
                     node_host, node_port = node_info
-                    print(f"File '{filename}' found at node {node_host}:{node_port}. Downloading...")
                     result = download_file(node_host, node_port, filename)
                     print(result)
                 else:

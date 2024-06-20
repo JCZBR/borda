@@ -29,8 +29,7 @@ def periodic_file_check():
             for filename, checksum in node_files.items():
                 print(f"- {filename}")
         print("")
-
-        time.sleep(5)  # Verifica a cada 5 segundos
+        time.sleep(5)
 
 def find_node_with_file(filename):
     for (node_host, node_port), node_files in nodes.items():
@@ -46,7 +45,7 @@ def start_edge_node(edge_node_host, edge_node_port):
     server.register_function(find_node_with_file, "find_node_with_file")
     
     threading.Thread(target=server.serve_forever).start()
-    threading.Thread(target=periodic_file_check).start()  # Thread para verificação periódica
+    threading.Thread(target=periodic_file_check).start()
     print(f"Edge node running on {edge_node_host}:{edge_node_port}")
 
 if __name__ == "__main__":
